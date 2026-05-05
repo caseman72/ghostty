@@ -2184,7 +2184,9 @@ extension Ghostty.SurfaceView {
     static let dropTypes: Set<NSPasteboard.PasteboardType> = [
         .string,
         .fileURL,
-        .URL
+        .URL,
+        .png,
+        .tiff
     ]
 
     override func draggingEntered(_ sender: any NSDraggingInfo) -> NSDragOperation {
@@ -2219,6 +2221,10 @@ extension Ghostty.SurfaceView {
             // Strings are not escaped because they may be copy/pasting a
             // command they want to execute.
             content = str
+        } else if let imageURL = pb.writeImageToTemporaryFile() {
+            // Image dropped without an accompanying file URL — materialize to a
+            // temp file and paste its escaped path.
+            content = Ghostty.Shell.escape(imageURL.path)
         } else {
             content = nil
         }

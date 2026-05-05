@@ -36,6 +36,7 @@ extension NSPasteboard {
     /// Does these things in order:
     /// - Tries to get the absolute filesystem path of the file in the pasteboard if there is one and ensures the file path is properly escaped.
     /// - Tries to get any string from the pasteboard.
+    /// - Tries to materialize an image payload to a temp file and returns its escaped path.
     /// If all of the above fail, returns None.
     func getOpinionatedStringContents() -> String? {
         if let urls = readObjects(forClasses: [NSURL.self]) as? [URL],
@@ -45,7 +46,12 @@ extension NSPasteboard {
                 .joined(separator: " ")
         }
 
-        return self.string(forType: .string)
+        if let str = self.string(forType: .string) { return str }
+
+        if let imageURL = writeImageToTemporaryFile() {
+            return Ghostty.Shell.escape(imageURL.path)
+        }
+        return nil
     }
 
     /// The pasteboard for the Ghostty enum type.
