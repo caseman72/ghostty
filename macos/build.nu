@@ -19,6 +19,12 @@ def main [
         []
     }
 
+    # Remove stale profraw files that block code signing
+    let app_path = ($build_dir | path join $configuration "Ghostty.app" "Contents" "MacOS" "default.profraw")
+    if ($app_path | path exists) {
+        rm $app_path
+    }
+
     (^env -i
         $"HOME=($env.HOME)"
         "PATH=/usr/bin:/bin:/usr/sbin:/sbin"

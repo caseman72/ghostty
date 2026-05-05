@@ -482,28 +482,32 @@ class AppDelegate: NSObject,
             // whether to open in a new tab or new window.
             config.workingDirectory = filename
         } else {
-            // Unconditionally require confirmation in the file execution case.
-            // In the future I have ideas about making this more fine-grained if
-            // we can not inherit of unsandboxed state. For now, we need to confirm
-            // because there is a sandbox escape possible if a sandboxed application
-            // somehow is tricked into `open`-ing a non-sandboxed application.
-            requiresConfirm = true
-
-            // When opening a file, we want to execute the file. To do this, we
-            // don't override the command directly, because it won't load the
-            // profile/rc files for the shell, which is super important on macOS
-            // due to things like Homebrew. Instead, we set the command to
-            // `<filename>; exit` which is what Terminal and iTerm2 do.
-            config.initialInput = "\(Ghostty.Shell.quote(filename)); exit\n"
-
-            // For commands executed directly, we want to ensure we wait after exit
-            // because in most cases scripts don't block on exit and we don't want
-            // the window to just flash closed once complete.
-            config.waitAfterCommand = true
-
-            // Set the parent directory to our working directory so that relative
-            // paths in scripts work.
+            // Parent directory becomes our working directory so that relative
+            // paths in scripts (and `:e`-style commands in editors) work.
             config.workingDirectory = (filename as NSString).deletingLastPathComponent
+
+            if FileManager.default.isExecutableFile(atPath: filename) {
+                // Unconditionally require confirmation in the file execution case.
+                // In the future I have ideas about making this more fine-grained if
+                // we can not inherit of unsandboxed state. For now, we need to confirm
+                // because there is a sandbox escape possible if a sandboxed application
+                // somehow is tricked into `open`-ing a non-sandboxed application.
+                requiresConfirm = true
+
+                // We don't override the command directly because it won't load the
+                // profile/rc files for the shell, which is super important on macOS
+                // due to things like Homebrew. Instead, we set the command to
+                // `<filename>; exit` which is what Terminal and iTerm2 do.
+                config.initialInput = "\(Ghostty.Shell.quote(filename)); exit\n"
+
+                // Wait after exit since most scripts don't block on exit and we
+                // don't want the window to just flash closed once complete.
+                config.waitAfterCommand = true
+            } else {
+                // Non-executable file: open it in the user's editor. Shell expands
+                // $EDITOR from the user's profile, falling back to vim.
+                config.initialInput = "${EDITOR:-vim} \(Ghostty.Shell.quote(filename))\n"
+            }
         }
 
         if requiresConfirm {
@@ -535,6 +539,61 @@ class AppDelegate: NSObject,
         }
 
         return true
+    }
+
+    /// Handle `ghostty://` URLs. Supported forms:
+    ///   `ghostty://new-tab?path=/some/dir&cmd=vi%20file`
+    ///   `ghostty://new-window?path=/some/dir&cmd=top`
+    /// Unknown hosts default to opening a new window.
+    ///
+    /// Note: when this method is implemented, AppKit routes every "open" event
+    /// (including `file://` URLs from Finder's Open With… and the Dock) here
+    /// *instead of* `application(_:openFile:)`. So we have to dispatch file
+    /// URLs to the openFile handler ourselves, otherwise document opens get
+    /// silently dropped.
+    func application(_ application: NSApplication, open urls: [URL]) {
+        for url in urls {
+            if url.isFileURL {
+                _ = self.application(NSApp, openFile: url.path)
+                continue
+            }
+
+            guard url.scheme == "ghostty" else { continue }
+
+            let components = URLComponents(url: url, resolvingAgainstBaseURL: false)
+            let query = components?.queryItems ?? []
+            func queryValue(_ name: String) -> String? {
+                query.first(where: { $0.name == name })?.value
+            }
+
+            var config = Ghostty.SurfaceConfiguration()
+
+            if let path = queryValue("path") ?? queryValue("cwd") {
+                var isDirectory = ObjCBool(false)
+                if FileManager.default.fileExists(atPath: path, isDirectory: &isDirectory),
+                   isDirectory.boolValue {
+                    config.workingDirectory = path
+                }
+            }
+
+            if let cmd = queryValue("cmd"), !cmd.isEmpty {
+                // Use initialInput (not command) so login scripts still run —
+                // matches the pattern used by openFile: and NewTerminalIntent.
+                config.initialInput = "\(cmd)\n"
+            }
+
+            let host = url.host?.lowercased() ?? "new-window"
+            switch host {
+            case "new-tab":
+                _ = TerminalController.newTab(
+                    ghostty,
+                    from: TerminalController.preferredParent?.window,
+                    withBaseConfig: config
+                )
+            default:
+                _ = TerminalController.newWindow(ghostty, withBaseConfig: config)
+            }
+        }
     }
 
     /// Setup signal handlers

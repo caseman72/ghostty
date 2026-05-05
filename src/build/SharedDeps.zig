@@ -893,7 +893,8 @@ pub fn gtkNgDistResources(
             }),
         });
         blueprint_exe.linkLibC();
-        blueprint_exe.linkSystemLibrary2("gtk4", dynamic_link_opts);
+        // libadwaita-1 already depends on gtk4, so only link libadwaita-1
+        // to avoid duplicate dylib entries which cause dyld failures on macOS.
         blueprint_exe.linkSystemLibrary2("libadwaita-1", dynamic_link_opts);
 
         for (gresource.blueprints) |bp| {

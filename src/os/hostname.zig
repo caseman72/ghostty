@@ -112,7 +112,15 @@ pub fn isLocal(hostname: []const u8) LocalHostnameValidationError!bool {
         else => {
             var buf: [posix.HOST_NAME_MAX]u8 = undefined;
             const ourHostname = try posix.gethostname(&buf);
-            return std.mem.eql(u8, hostname, ourHostname);
+            // Exact match
+            if (std.mem.eql(u8, hostname, ourHostname)) return true;
+            // Short hostname match: if our hostname is "foo.domain" and
+            // the provided hostname is "foo", treat it as local. Shells
+            // commonly use the short hostname (e.g. zsh $HOST).
+            if (std.mem.indexOfScalar(u8, ourHostname, '.')) |dot| {
+                if (std.mem.eql(u8, hostname, ourHostname[0..dot])) return true;
+            }
+            return false;
         },
     }
 }
