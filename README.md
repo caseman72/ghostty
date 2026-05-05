@@ -1,4 +1,10 @@
-**Personal fork of [Ghostty](https://github.com/ghostty-org/ghostty)** with a sidebar tab system for macOS. Not affiliated with the upstream project. For the official Ghostty terminal, visit [ghostty.org](https://ghostty.org).
+**Personal fork of [Ghostty](https://github.com/ghostty-org/ghostty)** for macOS. Builds on:
+
+- vertical sidebar tabs + IPC + `ghosttyctl` from [tomreinert/ghostty](https://github.com/tomreinert/ghostty)
+- image paste (Cmd+V / drag a screenshot → temp PNG path) ported from [manaflow-ai/cmux](https://github.com/manaflow-ai/cmux)'s `GhosttyPasteboardHelper`
+- local additions: `ghostty://` URL scheme, Finder "Open With…" handler for text/markdown files
+
+Not affiliated with the upstream project. For the official Ghostty terminal, visit [ghostty.org](https://ghostty.org).
 
 🧪 **Experimental**  
 Please note that this is experimental and I built it for my own use. It works fine for me, but feel free and try to break it.
@@ -72,6 +78,29 @@ Add to your `~/.claude/CLAUDE.md` so Claude Code can name its tabs and set statu
     <a href="HACKING.md">Developing</a>
   </p>
 </p>
+
+## Image paste
+
+Cmd+V or drag-drop with an image on the clipboard (a `Cmd+Shift+4` screenshot, an image copied from Preview or a browser, etc.) writes the image to a temp PNG and inserts the shell-escaped path. The shell sees text — same as dropping a file URL — so `cat`, `open`, `ls -l`, or AI tools that take file paths just work.
+
+URL/text payloads still take priority: copying a link or selected text pastes the way you expect. Image fallback only fires when the pasteboard has *only* image data.
+
+Ported from cmux's [`GhosttyPasteboardHelper`](https://github.com/manaflow-ai/cmux/blob/main/Sources/GhosttyTerminalView.swift).
+
+## `ghostty://` URL scheme
+
+Open a new tab or window from anywhere:
+
+```
+ghostty://new-tab?path=/some/dir&cmd=vim%20file.md
+ghostty://new-window?cwd=/repo&cmd=top
+```
+
+Both `path` and `cwd` set the working directory. `cmd` is fed via `initialInput` so login scripts run normally.
+
+## Open With… for text files
+
+Ghostty registers as an `Alternate` handler for `public.plain-text`, `public.text`, and `net.daringfireball.markdown`. Right-click → Open With → Ghostty opens a window in the file's parent directory and runs `${EDITOR:-vim} <file>`. Set as default with `duti -s com.mitchellh.ghostty md all` (or any extension/UTI).
 
 ## About
 
