@@ -12,25 +12,8 @@ struct SidebarTheme: Equatable {
 
     /// Create from Ghostty terminal colors.
     static func from(background: NSColor, foreground: NSColor) -> SidebarTheme {
-        let bgLuminance = background.luminance
-        let sidebarBg: Color
-        if bgLuminance > 0.5 {
-            // Light theme: darken sidebar slightly
-            sidebarBg = Color(nsColor: background.darken(by: 0.05))
-        } else {
-            // Dark theme: lighten sidebar slightly
-            sidebarBg = Color(nsColor: background.blended(withFraction: 0.08, of: NSColor.white) ?? background)
-        }
-
-        let fg = Color(nsColor: foreground)
-
-        return SidebarTheme(
-            background: sidebarBg,
-            foreground: fg,
-            secondaryText: fg.opacity(0.6),
-            activeTabBackground: fg.opacity(0.12),
-            attentionColor: .orange
-        )
+        // Always use system default colors for the sidebar, regardless of theme.
+        return .default
     }
 
     /// Sensible default when no terminal colors are available yet.
